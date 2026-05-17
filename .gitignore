@@ -1,0 +1,35 @@
+# Binary files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build output
+/main
+/app
+/bin
+/dist
+
+# Go test
+*.test
+*.out
+coverage.out
+
+# Environment variables
+.env
+
+# Air hot reload
+tmp/
+.air.toml
+
+# Vendor (opsional)
+vendor/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
