@@ -8,6 +8,8 @@ type Guru struct {
 	Jabatan   string    `json:"jabatan" gorm:"column:jabatan"`
 	Kelas     string    `json:"kelas" gorm:"column:kelas"`
 	Foto      *string   `json:"foto" gorm:"column:foto"`
+	Nip       string    `json:"nip" gorm:"column:nip;uniqueIndex"`
+	Password  string    `json:"-" gorm:"column:password"`
 	CreatedAt time.Time `json:"createdAt" gorm:"column:createdAt"`
 	UpdatedAt time.Time `json:"updatedAt" gorm:"column:updatedAt"`
 }

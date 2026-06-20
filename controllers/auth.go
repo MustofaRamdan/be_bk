@@ -49,34 +49,37 @@ func Register(c *gin.Context) {
 }
 
 func Login(c *gin.Context) {
-	var input models.User
-	var user models.User
+	var input struct {
+		Nip      string `json:"nip"`
+		Password string `json:"password"`
+	}
+	var guru models.Guru
 
 	c.ShouldBindJSON(&input)
 
-	config.DB.Where("email = ?", input.Email).First(&user)
+	config.DB.Where("nip = ?", input.Nip).First(&guru)
 
-	if user.ID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Email salah"})
+	if guru.ID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "NIP salah"})
 		return
 	}
 
-	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password))
+	err := bcrypt.CompareHashAndPassword([]byte(guru.Password), []byte(input.Password))
 
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Password salah"})
 		return
 	}
 
-	token, _ := utils.GenerateToken(user.ID, user.Email)
+	token, _ := utils.GenerateToken(guru.ID, guru.Nip)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login berhasil",
 		"token": token,
 		"user": gin.H{
-			"id": user.ID,
-			"name": user.Name,
-			"email": user.Email,
+			"id":   guru.ID,
+			"nama": guru.Nama,
+			"nip":  guru.Nip,
 		},
 	})
 }
