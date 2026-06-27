@@ -12,9 +12,9 @@ type Karya struct {
 	Email  		*string 	  `json:"email"`
 	Jurusan     string    `json:"jurusan" gorm:"column:jurusan"`
 	Thumbnail   *string   `json:"thumbnail" gorm:"column:thumbnail"`
-	Status      string    `json:"status" gorm:"column:status"`
+	Status      string    `json:"status" gorm:"column:status;index"`
 	Keterangan  *string   `json:"keterangan" gorm:"column:keterangan"`
-	CreatedAt   time.Time `json:"createdAt" gorm:"column:createdAt"`
+	CreatedAt   time.Time `json:"createdAt" gorm:"column:createdAt;index"`
 	UpdatedAt   time.Time `json:"updatedAt" gorm:"column:updatedAt"`
 }
 

@@ -26,6 +26,7 @@ func SetupRoutes(r *gin.Engine) {
 	
 	api.POST("/alumni", controllers.CreateAlumni)
 	api.POST("/konseling", controllers.CreateKonseling)
+	api.POST("/upload", controllers.Upload)
 
 	// Protected Routes
 	protected := api.Group("")
@@ -34,7 +35,6 @@ func SetupRoutes(r *gin.Engine) {
 		protected.POST("/posts", controllers.CreatePost)
 		protected.PUT("/posts/:id", controllers.UpdatePost)
 		protected.DELETE("/posts/:id", controllers.DeletePost)
-		protected.POST("/upload", controllers.Upload)
 
 		protected.POST("/karya", controllers.CreateKarya)
 		protected.PUT("/karya/:id", controllers.UpdateKarya)

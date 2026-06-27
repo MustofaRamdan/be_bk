@@ -10,7 +10,7 @@ type Guru struct {
 	Foto      *string   `json:"foto" gorm:"column:foto"`
 	Nip       string    `json:"nip" gorm:"column:nip;uniqueIndex"`
 	Password  string    `json:"-" gorm:"column:password"`
-	CreatedAt time.Time `json:"createdAt" gorm:"column:createdAt"`
+	CreatedAt time.Time `json:"createdAt" gorm:"column:createdAt;index"`
 	UpdatedAt time.Time `json:"updatedAt" gorm:"column:updatedAt"`
 }
 

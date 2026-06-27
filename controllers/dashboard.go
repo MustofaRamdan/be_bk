@@ -4,155 +4,183 @@ import (
 	"backend-bk/config"
 	"backend-bk/models"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
+// dashAlumniStat for GROUP BY alumni status queries
+type dashAlumniStat struct {
+	Status string
+	Total  int64
+}
+
+// growthResult for conditional COUNT queries
+type growthResult struct {
+	BulanIni  int64
+	BulanLalu int64
+}
+
 func GetDashboard(c *gin.Context) {
-	// =====================
-	// VARIABEL
-	// =====================
+	now := time.Now()
+	firstDayOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
+	firstDayOfLastMonth := firstDayOfMonth.AddDate(0, -1, 0)
+
+	var wg sync.WaitGroup
+
 	var totalSiswa int64
 	var totalArtikel int64
 	var totalGuru int64
 	var totalKarya int64
-	var totalAlumni int64
-
-	var kuliah int64
-	var bekerja int64
-	var wirausaha int64
-
+	var alumniStats []dashAlumniStat
 	var pendingKarya int64
 	var pendingAlumni int64
+	var artikelGrowthResult growthResult
+	var guruGrowthResult growthResult
+	var karyaGrowthResult growthResult
+	var alumniGrowthResult growthResult
+	var posts []models.Post
+	var karya []models.Karya
+	var alumni []models.Alumni
 
-	now := time.Now()
+	wg.Add(14)
 
-	firstDayOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
-	firstDayOfLastMonth := firstDayOfMonth.AddDate(0, -1, 0)
+	// 1. Total Siswa
+	go func() {
+		defer wg.Done()
+		config.DB.Model(&models.User{}).Count(&totalSiswa)
+	}()
 
-	// =====================
-	// TOTAL DATA
-	// =====================
+	// 2. Total Artikel
+	go func() {
+		defer wg.Done()
+		config.DB.Model(&models.Post{}).Where("published = ?", true).Count(&totalArtikel)
+	}()
 
-	config.DB.Model(&models.User{}).Count(&totalSiswa)
+	// 3. Total Guru
+	go func() {
+		defer wg.Done()
+		config.DB.Model(&models.Guru{}).Count(&totalGuru)
+	}()
 
-	config.DB.Model(&models.Post{}).
-		Where("published = ?", true).
-		Count(&totalArtikel)
+	// 4. Total Karya
+	go func() {
+		defer wg.Done()
+		config.DB.Model(&models.Karya{}).Count(&totalKarya)
+	}()
 
-	config.DB.Model(&models.Guru{}).Count(&totalGuru)
+	// 5. Alumni Stats
+	go func() {
+		defer wg.Done()
+		config.DB.Model(&models.Alumni{}).
+			Select("status, COUNT(*) as total").
+			Where("status_pengajuan = ?", "DITERIMA").
+			Group("status").
+			Find(&alumniStats)
+	}()
 
-	config.DB.Model(&models.Karya{}).Count(&totalKarya)
+	// 6. Pending Karya
+	go func() {
+		defer wg.Done()
+		config.DB.Model(&models.Karya{}).Where("status = ?", "PENDING").Count(&pendingKarya)
+	}()
 
-	config.DB.Model(&models.Alumni{}).
-		Where("status_pengajuan = ?", "DITERIMA").
-		Count(&totalAlumni)
+	// 7. Pending Alumni
+	go func() {
+		defer wg.Done()
+		config.DB.Model(&models.Alumni{}).Where("status_pengajuan = ?", "PENDING").Count(&pendingAlumni)
+	}()
 
-	// =====================
-	// STATUS ALUMNI
-	// =====================
+	// 8. Growth Artikel
+	go func() {
+		defer wg.Done()
+		config.DB.Model(&models.Post{}).
+			Select(
+				"COALESCE(SUM(CASE WHEN createdAt >= ? THEN 1 ELSE 0 END), 0) as bulan_ini, "+
+					"COALESCE(SUM(CASE WHEN createdAt >= ? AND createdAt < ? THEN 1 ELSE 0 END), 0) as bulan_lalu",
+				firstDayOfMonth, firstDayOfLastMonth, firstDayOfMonth,
+			).
+			Where("published = ?", true).
+			Find(&artikelGrowthResult)
+	}()
 
-	config.DB.Model(&models.Alumni{}).
-		Where("status = ?", "KULIAH").
-		Count(&kuliah)
+	// 9. Growth Guru
+	go func() {
+		defer wg.Done()
+		config.DB.Model(&models.Guru{}).
+			Select(
+				"COALESCE(SUM(CASE WHEN createdAt >= ? THEN 1 ELSE 0 END), 0) as bulan_ini, "+
+					"COALESCE(SUM(CASE WHEN createdAt >= ? AND createdAt < ? THEN 1 ELSE 0 END), 0) as bulan_lalu",
+				firstDayOfMonth, firstDayOfLastMonth, firstDayOfMonth,
+			).
+			Find(&guruGrowthResult)
+	}()
 
-	config.DB.Model(&models.Alumni{}).
-		Where("status = ?", "BEKERJA").
-		Count(&bekerja)
+	// 10. Growth Karya
+	go func() {
+		defer wg.Done()
+		config.DB.Model(&models.Karya{}).
+			Select(
+				"COALESCE(SUM(CASE WHEN createdAt >= ? THEN 1 ELSE 0 END), 0) as bulan_ini, "+
+					"COALESCE(SUM(CASE WHEN createdAt >= ? AND createdAt < ? THEN 1 ELSE 0 END), 0) as bulan_lalu",
+				firstDayOfMonth, firstDayOfLastMonth, firstDayOfMonth,
+			).
+			Find(&karyaGrowthResult)
+	}()
 
-	config.DB.Model(&models.Alumni{}).
-		Where("status = ?", "WIRAUSAHA").
-		Count(&wirausaha)
+	// 11. Growth Alumni
+	go func() {
+		defer wg.Done()
+		config.DB.Model(&models.Alumni{}).
+			Select(
+				"COALESCE(SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END), 0) as bulan_ini, "+
+					"COALESCE(SUM(CASE WHEN created_at >= ? AND created_at < ? THEN 1 ELSE 0 END), 0) as bulan_lalu",
+				firstDayOfMonth, firstDayOfLastMonth, firstDayOfMonth,
+			).
+			Where("status_pengajuan = ?", "DITERIMA").
+			Find(&alumniGrowthResult)
+	}()
 
-	// =====================
-	// PENDING
-	// =====================
+	// 12. Recent Posts
+	go func() {
+		defer wg.Done()
+		config.DB.Order("createdAt desc").Limit(3).Find(&posts)
+	}()
 
-	config.DB.Model(&models.Karya{}).
-		Where("status = ?", "PENDING").
-		Count(&pendingKarya)
+	// 13. Recent Karya
+	go func() {
+		defer wg.Done()
+		config.DB.Order("createdAt desc").Limit(3).Find(&karya)
+	}()
 
-	config.DB.Model(&models.Alumni{}).
-		Where("status_pengajuan = ?", "PENDING").
-		Count(&pendingAlumni)
+	// 14. Recent Alumni
+	go func() {
+		defer wg.Done()
+		config.DB.Order("created_at desc").Limit(3).Find(&alumni)
+	}()
 
-	// =====================
-	// GROWTH ARTIKEL
-	// =====================
+	wg.Wait()
 
-	var artikelBulanIni int64
-	var artikelBulanLalu int64
+	var totalAlumni, kuliah, bekerja, wirausaha int64
+	for _, s := range alumniStats {
+		totalAlumni += s.Total
+		switch s.Status {
+		case "KULIAH":
+			kuliah = s.Total
+		case "BEKERJA":
+			bekerja = s.Total
+		case "WIRAUSAHA":
+			wirausaha = s.Total
+		}
+	}
 
-	config.DB.Model(&models.Post{}).
-		Where("published = ? AND createdAt >= ?", true, firstDayOfMonth).
-		Count(&artikelBulanIni)
-
-	config.DB.Model(&models.Post{}).
-		Where("published = ? AND createdAt >= ? AND createdAt < ?", true, firstDayOfLastMonth, firstDayOfMonth).
-		Count(&artikelBulanLalu)
-
-	artikelGrowth := calculateGrowth(artikelBulanIni, artikelBulanLalu)
-
-	// =====================
-	// GROWTH GURU
-	// =====================
-
-	var guruBulanIni int64
-	var guruBulanLalu int64
-
-	config.DB.Model(&models.Guru{}).
-		Where("createdAt >= ?", firstDayOfMonth).
-		Count(&guruBulanIni)
-
-	config.DB.Model(&models.Guru{}).
-		Where("createdAt >= ? AND createdAt < ?", firstDayOfLastMonth, firstDayOfMonth).
-		Count(&guruBulanLalu)
-
-	guruGrowth := calculateGrowth(guruBulanIni, guruBulanLalu)
-
-	// =====================
-	// GROWTH KARYA
-	// =====================
-
-	var karyaBulanIni int64
-	var karyaBulanLalu int64
-
-	config.DB.Model(&models.Karya{}).
-		Where("createdAt >= ?", firstDayOfMonth).
-		Count(&karyaBulanIni)
-
-	config.DB.Model(&models.Karya{}).
-		Where("createdAt >= ? AND createdAt < ?", firstDayOfLastMonth, firstDayOfMonth).
-		Count(&karyaBulanLalu)
-
-	karyaGrowth := calculateGrowth(karyaBulanIni, karyaBulanLalu)
-
-	// =====================
-	// GROWTH ALUMNI (DITERIMA)
-	// =====================
-
-	var alumniBulanIni int64
-	var alumniBulanLalu int64
-
-	config.DB.Model(&models.Alumni{}).
-		Where("status_pengajuan = ? AND created_at >= ?", "DITERIMA", firstDayOfMonth).
-		Count(&alumniBulanIni)
-
-	config.DB.Model(&models.Alumni{}).
-		Where("status_pengajuan = ? AND created_at >= ? AND created_at < ?", "DITERIMA", firstDayOfLastMonth, firstDayOfMonth).
-		Count(&alumniBulanLalu)
-
-	alumniGrowth := calculateGrowth(alumniBulanIni, alumniBulanLalu)
-
-	// =====================
-	// AKTIVITAS TERBARU
-	// =====================
+	artikelGrowth := calculateGrowth(artikelGrowthResult.BulanIni, artikelGrowthResult.BulanLalu)
+	guruGrowth := calculateGrowth(guruGrowthResult.BulanIni, guruGrowthResult.BulanLalu)
+	karyaGrowth := calculateGrowth(karyaGrowthResult.BulanIni, karyaGrowthResult.BulanLalu)
+	alumniGrowth := calculateGrowth(alumniGrowthResult.BulanIni, alumniGrowthResult.BulanLalu)
 
 	var aktivitas []gin.H
-
-	var posts []models.Post
-	config.DB.Order("createdAt desc").Limit(3).Find(&posts)
 
 	for _, p := range posts {
 		title := p.Title
@@ -170,9 +198,6 @@ func GetDashboard(c *gin.Context) {
 		})
 	}
 
-	var karya []models.Karya
-	config.DB.Order("createdAt desc").Limit(3).Find(&karya)
-
 	for _, k := range karya {
 		aktivitas = append(aktivitas, gin.H{
 			"id":      k.ID,
@@ -183,9 +208,6 @@ func GetDashboard(c *gin.Context) {
 			"tipe":    "karya",
 		})
 	}
-
-	var alumni []models.Alumni
-	config.DB.Order("created_at desc").Limit(3).Find(&alumni)
 
 	for _, a := range alumni {
 		aktivitas = append(aktivitas, gin.H{
@@ -210,7 +232,7 @@ func GetDashboard(c *gin.Context) {
 			"artikel": gin.H{
 				"total":    totalArtikel,
 				"growth":   artikelGrowth,
-				"bulanIni": artikelBulanIni,
+				"bulanIni": artikelGrowthResult.BulanIni,
 			},
 
 			"guruBK": gin.H{

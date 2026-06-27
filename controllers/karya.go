@@ -292,6 +292,14 @@ func UpdateKarya(c *gin.Context) {
 		}
 	}
 
+	if karya.Status == "DITOLAK" {
+		// Hapus file thumbnail jika ada
+		if karya.Thumbnail != nil && *karya.Thumbnail != "" {
+			os.Remove("." + *karya.Thumbnail)
+		}
+		config.DB.Delete(&karya)
+	}
+
 	c.JSON(200, gin.H{
 		"success": true,
 		"data":    karya,

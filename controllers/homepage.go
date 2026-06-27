@@ -7,13 +7,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// alumniStat holds the result of a GROUP BY status query
+type alumniStat struct {
+	Status string
+	Total  int64
+}
+
 func GetHomepage(c *gin.Context) {
 	// ======================
 	// GURU BK
 	// ======================
 	var guru []models.Guru
 	config.DB.
-		Order("createdAt desc"). // atau "createdAt" sesuai nama kolom DB Anda
+		Order("createdAt desc").
 		Limit(5).
 		Find(&guru)
 
@@ -45,7 +51,7 @@ func GetHomepage(c *gin.Context) {
 	}
 
 	// ======================
-	// HERO ARTI	EL
+	// HERO ARTIKEL
 	// ======================
 	var hero interface{} = nil
 	if len(artikel) > 0 {
@@ -53,27 +59,28 @@ func GetHomepage(c *gin.Context) {
 	}
 
 	// ======================
-	// TOTAL ALUMNI
+	// ALUMNI STATS — Single query with GROUP BY
+	// Instead of 4 separate COUNT queries, use 1 query
 	// ======================
-	var totalAlumni int64
-	config.DB.
-		Model(&models.Alumni{}).
+	var stats []alumniStat
+	config.DB.Model(&models.Alumni{}).
+		Select("status, COUNT(*) as total").
 		Where("status_pengajuan = ?", "DITERIMA").
-		Count(&totalAlumni)
+		Group("status").
+		Find(&stats)
 
-	// ======================
-	// STATS KARIR ALUMNI
-	// ======================
-	var kuliah, kerja, wirausaha int64
-	config.DB.Model(&models.Alumni{}).
-		Where("status_pengajuan = ? AND status = ?", "DITERIMA", "KULIAH").
-		Count(&kuliah)
-	config.DB.Model(&models.Alumni{}).
-		Where("status_pengajuan = ? AND status = ?", "DITERIMA", "BEKERJA").
-		Count(&kerja)
-	config.DB.Model(&models.Alumni{}).
-		Where("status_pengajuan = ? AND status = ?", "DITERIMA", "WIRAUSAHA").
-		Count(&wirausaha)
+	var totalAlumni, kuliah, kerja, wirausaha int64
+	for _, s := range stats {
+		totalAlumni += s.Total
+		switch s.Status {
+		case "KULIAH":
+			kuliah = s.Total
+		case "BEKERJA":
+			kerja = s.Total
+		case "WIRAUSAHA":
+			wirausaha = s.Total
+		}
+	}
 
 	var persenKuliah, persenKerja, persenWirausaha int64
 	if totalAlumni > 0 {
@@ -90,8 +97,8 @@ func GetHomepage(c *gin.Context) {
 		"data": gin.H{
 			"hero":        hero,
 			"artikel":     artikel,
-			"guru":        guru,    // ← TAMBAH
-			"karya":       karya,   // ← TAMBAH
+			"guru":        guru,
+			"karya":       karya,
 			"totalAlumni": totalAlumni,
 			"statsKarir": gin.H{
 				"kuliah": gin.H{

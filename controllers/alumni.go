@@ -4,6 +4,7 @@ import (
 	"backend-bk/config"
 	"backend-bk/models"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -217,13 +218,25 @@ func UpdateAlumniStatus(c *gin.Context) {
 		alumni.Keterangan = nil
 	}
 
-	if err := config.DB.Save(&alumni).Error; err != nil {
-		c.JSON(500, gin.H{"error": "Gagal mengupdate alumni"})
-		return
+	if alumni.StatusPengajuan == models.DITOLAK {
+		// Hapus file bukti pendukung jika ada
+		if alumni.BuktiPendukung != nil && *alumni.BuktiPendukung != "" {
+			os.Remove("." + *alumni.BuktiPendukung)
+		}
+		if err := config.DB.Delete(&alumni).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Gagal menghapus data alumni yang ditolak"})
+			return
+		}
+	} else {
+		if err := config.DB.Save(&alumni).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Gagal mengupdate alumni"})
+			return
+		}
 	}
 
 	c.JSON(200, gin.H{
 		"success": true,
+		"message": "Data alumni berhasil diproses",
 		"data":    alumni,
 	})
 }

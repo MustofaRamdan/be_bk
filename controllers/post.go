@@ -4,9 +4,10 @@ import (
 	"backend-bk/config"
 	"backend-bk/models"
 	"net/http"
+	"os"
+	"regexp"
 	"strings"
 	"time"
-	"os"
 
 	"github.com/gin-gonic/gin"
 )
@@ -156,10 +157,14 @@ func DeletePost(c *gin.Context) {
 		c.JSON(404, gin.H{"error": "Artikel tidak ditemukan"})
 		return
 	}
+	// Hapus thumbnail utama
 	if post.Thumbnail != nil && *post.Thumbnail != "" {
 		path := "." + *post.Thumbnail
 		os.Remove(path)
 	}
+
+	// Hapus gambar yang di-upload di dalam konten editor artikel
+	deleteContentImages(post.Content)
 
 	config.DB.Delete(&post)
 
@@ -167,4 +172,19 @@ func DeletePost(c *gin.Context) {
 		"success": true,
 		"message": "Artikel dihapus",
 	})
+}
+
+func deleteContentImages(content string) {
+	re := regexp.MustCompile(`src="([^"]*?/uploads/[^"]+)"`)
+	matches := re.FindAllStringSubmatch(content, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			urlPath := match[1]
+			idx := strings.Index(urlPath, "/uploads/")
+			if idx != -1 {
+				filePath := "." + urlPath[idx:]
+				os.Remove(filePath)
+			}
+		}
+	}
 }

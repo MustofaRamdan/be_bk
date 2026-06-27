@@ -19,7 +19,7 @@ type Alumni struct {
 	ID              uint             `json:"id" gorm:"primaryKey"`
 	NamaLengkap     string           `json:"namaLengkap"`
 	TahunLulus      string           `json:"tahunLulus"`
-	Status          StatusAlumni     `json:"status"`
+	Status          StatusAlumni     `json:"status" gorm:"index"`
 
 	// Kuliah
 	NamaKampus       *string `json:"namaKampus"`
@@ -35,9 +35,9 @@ type Alumni struct {
 	TahunAwalUsaha *string `json:"tahunAwalUsaha"`
 
 	BuktiPendukung  *string          `json:"buktiPendukung"`
-	StatusPengajuan StatusPengajuan  `json:"statusPengajuan" gorm:"default:PENDING"`
+	StatusPengajuan StatusPengajuan  `json:"statusPengajuan" gorm:"index;default:PENDING"`
 	Keterangan *string `json:"keterangan" gorm:"column:keterangan"`
 
-	CreatedAt time.Time
+	CreatedAt time.Time        `gorm:"index"`
 	UpdatedAt time.Time
 }
